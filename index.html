@@ -29,7 +29,6 @@
             from { opacity: 0; transform: scale(0.95); }
             to { opacity: 1; transform: scale(1); }
         }
-        /* Анимация вращения пластинки */
         .record-spin {
             animation: spin 3s linear infinite;
         }
@@ -40,29 +39,42 @@
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        
-        /* Скрываем скроллбар */
         ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-gray-900 via-purple-900 to-black">
 
-    <!-- Аудио плеер -->
     <audio id="bg-music" loop preload="auto"></audio>
 
-    <!-- Уведомления -->
     <div id="toast" class="fixed top-5 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-2xl z-50 transition-all duration-300 -translate-y-24 opacity-0 flex items-center space-x-2">
         <i id="toast-icon" class="fas fa-info-circle"></i>
         <span id="toast-message" class="font-bold text-sm"></span>
     </div>
 
-    <!-- ЭКРАН ЗАГРУЗКИ / ИНИЦИАЛИЗАЦИИ FIRESTORE -->
+    <!-- ЭКРАН 1: ЗАГРУЗКА -->
     <div id="screen-loading" class="screen active justify-center">
         <i class="fas fa-circle-notch fa-spin text-5xl text-purple-500 mb-4"></i>
-        <p class="text-xl font-bold animate-pulse">Подключение к матрице...</p>
+        <p class="text-xl font-bold animate-pulse">Подключение к Firebase...</p>
     </div>
 
-    <!-- ЭКРАН СКАНИРОВАНИЯ -->
+    <!-- ЭКРАН 2: ОШИБКА БАЗЫ ДАННЫХ -->
+    <div id="screen-error" class="screen justify-center p-6 text-center">
+        <i class="fas fa-lock text-6xl text-red-500 mb-6 animate-bounce"></i>
+        <h2 class="text-2xl font-bold text-red-400 mb-4">Доступ запрещен</h2>
+        <p class="text-gray-300 text-sm mb-6 text-left bg-gray-800 p-4 rounded-xl border border-gray-700">
+            Ключи вставлены правильно, но база данных Firebase блокирует подключение.
+        </p>
+        <div class="text-left text-xs text-gray-400 space-y-3 mb-6 bg-gray-900 p-4 rounded-xl border border-gray-800">
+            <p class="text-white font-bold text-sm mb-2">🛠 Что нужно включить в Firebase:</p>
+            <p>1. В левом меню выберите <b>Authentication</b> -> вкладка <b>Sign-in method</b>.</p>
+            <p>2. Найдите <b>Anonymous</b>, включите его и сохраните.</p>
+            <p>3. В левом меню выберите <b>Firestore Database</b>.</p>
+            <p>4. Нажмите <b>Create database</b> и обязательно выберите <b>Start in test mode</b>.</p>
+            <p>5. Перезагрузите эту страницу.</p>
+        </div>
+    </div>
+
+    <!-- ЭКРАН 3: СКАНИРОВАНИЕ -->
     <div id="screen-scan" class="screen justify-center p-6 text-center">
         <div class="mb-8 relative">
             <div class="absolute inset-0 bg-purple-500 rounded-full blur-xl opacity-50 animate-pulse"></div>
@@ -74,7 +86,7 @@
         <h1 class="text-3xl font-extrabold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
             NFC Визитка
         </h1>
-        <p class="text-gray-300 mb-10 max-w-xs mx-auto">Приложите метку к телефону, чтобы открыть профиль.</p>
+        <p class="text-gray-300 mb-10 max-w-xs mx-auto">Приложите метку к телефону, чтобы открыть профиль из облака.</p>
 
         <button id="btn-scan" class="w-full max-w-sm bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold py-4 px-8 rounded-2xl shadow-lg shadow-purple-500/30 transition transform hover:scale-105 active:scale-95 mb-4 text-lg">
             <i class="fas fa-wifi mr-2"></i> Читать метку
@@ -85,9 +97,8 @@
         </button>
     </div>
 
-    <!-- ЭКРАН ПРОФИЛЯ -->
+    <!-- ЭКРАН 4: ПРОФИЛЬ -->
     <div id="screen-profile" class="screen p-4 sm:p-6 max-w-md mx-auto relative pb-24">
-        <!-- Кнопка редактирования и выхода -->
         <div class="w-full flex justify-between items-center mb-6 pt-2">
             <button id="btn-back" class="glass-panel w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/20 transition">
                 <i class="fas fa-chevron-left"></i>
@@ -97,22 +108,16 @@
             </button>
         </div>
 
-        <!-- Аватарка -->
         <div class="relative mb-6">
             <div class="absolute inset-0 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-full blur-md opacity-70"></div>
-            <img id="profile-photo" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Avatar" class="w-32 h-32 rounded-full border-4 border-gray-900 relative z-10 object-cover bg-gray-800">
+            <img id="profile-photo" src="" alt="Avatar" class="w-32 h-32 rounded-full border-4 border-gray-900 relative z-10 object-cover bg-gray-800">
         </div>
 
-        <!-- Инфо -->
-        <h2 id="profile-name" class="text-2xl font-extrabold text-center mb-2">Имя Пользователя</h2>
-        <p id="profile-bio" class="text-center text-gray-300 text-sm mb-8 px-4 leading-relaxed">Здесь будет ваше красивое описание, статус или просто пара слов о себе.</p>
+        <h2 id="profile-name" class="text-2xl font-extrabold text-center mb-2"></h2>
+        <p id="profile-bio" class="text-center text-gray-300 text-sm mb-8 px-4 leading-relaxed"></p>
 
-        <!-- Ссылки -->
-        <div class="w-full space-y-4" id="links-container">
-            <!-- Ссылки рендерятся через JS -->
-        </div>
+        <div class="w-full space-y-4" id="links-container"></div>
 
-        <!-- Музыкальный плеер (плавающий снизу) -->
         <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 glass-panel rounded-full px-6 py-3 flex items-center space-x-4 shadow-2xl z-40 w-max max-w-[90%] border-t border-white/20">
             <div class="relative w-10 h-10 flex-shrink-0">
                 <div id="music-disc" class="w-full h-full rounded-full bg-black border-2 border-gray-600 flex items-center justify-center">
@@ -129,7 +134,7 @@
         </div>
     </div>
 
-    <!-- ЭКРАН РЕДАКТИРОВАНИЯ -->
+    <!-- ЭКРАН 5: РЕДАКТОР -->
     <div id="screen-edit" class="screen p-4 sm:p-6 max-w-md mx-auto">
         <div class="w-full flex justify-between items-center mb-6 pt-2">
             <h2 class="text-xl font-bold">Настройки Bio</h2>
@@ -139,23 +144,22 @@
         <div class="w-full space-y-4 pb-10">
             <div>
                 <label class="text-xs text-pink-400 font-bold uppercase">Имя / Никнейм</label>
-                <input type="text" id="edit-name" class="w-full bg-gray-800 text-white rounded-xl px-4 py-3 mt-1 outline-none focus:ring-2 focus:ring-purple-500 border border-gray-700">
+                <input type="text" id="edit-name" class="w-full bg-gray-800 text-white rounded-xl px-4 py-3 mt-1 outline-none border border-gray-700">
             </div>
             
             <div>
                 <label class="text-xs text-pink-400 font-bold uppercase">О себе (Bio)</label>
-                <textarea id="edit-bio" rows="3" class="w-full bg-gray-800 text-white rounded-xl px-4 py-3 mt-1 outline-none focus:ring-2 focus:ring-purple-500 border border-gray-700"></textarea>
+                <textarea id="edit-bio" rows="3" class="w-full bg-gray-800 text-white rounded-xl px-4 py-3 mt-1 outline-none border border-gray-700"></textarea>
             </div>
 
             <div>
                 <label class="text-xs text-pink-400 font-bold uppercase">Ссылка на фото (URL)</label>
-                <input type="text" id="edit-photo" placeholder="https://..." class="w-full bg-gray-800 text-white rounded-xl px-4 py-3 mt-1 outline-none focus:ring-2 focus:ring-purple-500 border border-gray-700 text-sm">
+                <input type="text" id="edit-photo" class="w-full bg-gray-800 text-white rounded-xl px-4 py-3 mt-1 outline-none border border-gray-700 text-sm">
             </div>
 
             <div>
-                <label class="text-xs text-pink-400 font-bold uppercase">Ссылка на музыку (MP3/URL)</label>
-                <input type="text" id="edit-music" placeholder="Оставьте пустым для стандарта" class="w-full bg-gray-800 text-white rounded-xl px-4 py-3 mt-1 outline-none focus:ring-2 focus:ring-purple-500 border border-gray-700 text-sm">
-                <p class="text-[10px] text-gray-400 mt-1">Поддерживаются прямые ссылки на .mp3 файлы</p>
+                <label class="text-xs text-pink-400 font-bold uppercase">Ссылка на музыку (MP3)</label>
+                <input type="text" id="edit-music" class="w-full bg-gray-800 text-white rounded-xl px-4 py-3 mt-1 outline-none border border-gray-700 text-sm">
             </div>
 
             <div class="pt-4 border-t border-gray-700">
@@ -163,21 +167,21 @@
                 <div class="space-y-3">
                     <div class="flex items-center space-x-3 bg-gray-800 rounded-xl px-4 py-2 border border-gray-700">
                         <i class="fab fa-telegram text-blue-400 text-xl"></i>
-                        <input type="text" id="edit-tg" placeholder="Имя пользователя (без @) или ссылка" class="w-full bg-transparent text-white outline-none text-sm">
+                        <input type="text" id="edit-tg" placeholder="Ссылка на TG" class="w-full bg-transparent text-white outline-none text-sm">
                     </div>
                     <div class="flex items-center space-x-3 bg-gray-800 rounded-xl px-4 py-2 border border-gray-700">
                         <i class="fab fa-vk text-blue-500 text-xl"></i>
-                        <input type="text" id="edit-vk" placeholder="Ссылка на страницу" class="w-full bg-transparent text-white outline-none text-sm">
+                        <input type="text" id="edit-vk" placeholder="Ссылка на VK" class="w-full bg-transparent text-white outline-none text-sm">
                     </div>
                     <div class="flex items-center space-x-3 bg-gray-800 rounded-xl px-4 py-2 border border-gray-700">
                         <i class="fab fa-youtube text-red-500 text-xl"></i>
-                        <input type="text" id="edit-yt" placeholder="Ссылка на канал" class="w-full bg-transparent text-white outline-none text-sm">
+                        <input type="text" id="edit-yt" placeholder="Ссылка на YouTube" class="w-full bg-transparent text-white outline-none text-sm">
                     </div>
                 </div>
             </div>
 
             <button id="btn-save-edit" class="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-bold py-4 px-8 rounded-xl shadow-lg mt-6 transition transform active:scale-95">
-                <i class="fas fa-save mr-2"></i> Сохранить в метку
+                <i class="fas fa-save mr-2"></i> Сохранить в облако
             </button>
         </div>
     </div>
@@ -185,36 +189,40 @@
     <!-- FIREBASE AND APP LOGIC -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Конфигурация Firebase
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // === ВАШИ КЛЮЧИ FIREBASE ===
+        const firebaseConfig = {
+            apiKey: "AIzaSyBRzfRyhGFCIYOFtLBW9fm0Ug-3pZ-Y4t4",
+            authDomain: "mikepr-88f70.firebaseapp.com",
+            projectId: "mikepr-88f70",
+            storageBucket: "mikepr-88f70.firebasestorage.app",
+            messagingSenderId: "976306665307",
+            appId: "1:976306665307:web:335e3f900e206bc9534c7e"
+        };
+
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'nfc-bio-app';
 
         // Состояние
         let currentUser = null;
         let currentNfcId = null;
         let isPlaying = false;
-        
-        // Стандартные данные для новой метки
         const DEFAULT_MUSIC = "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3"; 
         
         let profileData = {
-            name: "Анонимный Кот",
-            bio: "Я только что привязал эту NFC метку. Мой профиль еще пуст, но скоро здесь будет круто!",
+            name: "Новый Пользователь",
+            bio: "Этот профиль еще пуст. Нажмите 'Редактировать', чтобы заполнить его!",
             photoUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=NFC",
             musicUrl: DEFAULT_MUSIC,
-            tgLink: "",
-            vkLink: "",
-            ytLink: ""
+            tgLink: "", vkLink: "", ytLink: ""
         };
 
         const screens = {
             loading: document.getElementById('screen-loading'),
+            error: document.getElementById('screen-error'),
             scan: document.getElementById('screen-scan'),
             profile: document.getElementById('screen-profile'),
             edit: document.getElementById('screen-edit')
@@ -225,11 +233,10 @@
         const playIcon = document.getElementById('play-icon');
         const disc = document.getElementById('music-disc');
 
-        // --- УТИЛИТЫ ---
         function showScreen(name) {
             Object.values(screens).forEach(s => s.classList.remove('active'));
             screens[name].classList.add('active');
-            if(name !== 'profile') pauseMusic(); // Останавливаем музыку, если ушли с профиля
+            if(name !== 'profile') pauseMusic(); 
         }
 
         function showToast(msg, isError = false) {
@@ -244,10 +251,8 @@
             }, 3000);
         }
 
-        // --- ЛОГИКА МУЗЫКИ ---
         function toggleMusic() {
-            if(isPlaying) pauseMusic();
-            else playMusic();
+            if(isPlaying) pauseMusic(); else playMusic();
         }
 
         function playMusic() {
@@ -256,7 +261,6 @@
                 playIcon.className = "fas fa-pause";
                 disc.classList.add('record-spin');
             }).catch(e => {
-                console.log("Автозапуск заблокирован браузером. Ждем клика пользователя.", e);
                 isPlaying = false;
                 playIcon.className = "fas fa-play";
                 disc.classList.remove('record-spin');
@@ -272,34 +276,29 @@
 
         playBtn.addEventListener('click', toggleMusic);
 
-        // --- ОТРИСОВКА ПРОФИЛЯ ---
         function renderProfile() {
             document.getElementById('profile-name').textContent = profileData.name || "Без имени";
             document.getElementById('profile-bio').textContent = profileData.bio || "";
             document.getElementById('profile-photo').src = profileData.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentNfcId}`;
             
-            // Настройка музыки
             audio.src = profileData.musicUrl || DEFAULT_MUSIC;
             audio.load();
             
-            // Отрисовка соцсетей
             const linksContainer = document.getElementById('links-container');
             linksContainer.innerHTML = '';
 
             const createLinkBtn = (url, icon, color, text) => {
                 if(!url) return;
-                // Форматируем ссылку TG, если ввели просто ник
                 let finalUrl = url;
                 if(icon.includes('telegram') && !url.includes('http')) {
                     finalUrl = `https://t.me/${url.replace('@', '')}`;
                 }
-
                 const a = document.createElement('a');
                 a.href = finalUrl;
                 a.target = "_blank";
                 a.className = `glass-panel w-full flex items-center p-4 rounded-2xl hover:bg-white/10 transition transform active:scale-95 group`;
                 a.innerHTML = `
-                    <div class="w-10 h-10 rounded-full ${color} flex items-center justify-center mr-4 group-hover:scale-110 transition">
+                    <div class="w-10 h-10 rounded-full ${color} flex items-center justify-center mr-4">
                         <i class="${icon} text-white text-xl"></i>
                     </div>
                     <span class="font-bold text-gray-200">${text}</span>
@@ -313,40 +312,41 @@
             createLinkBtn(profileData.ytLink, 'fab fa-youtube', 'bg-red-600', 'YouTube');
 
             if(linksContainer.innerHTML === '') {
-                linksContainer.innerHTML = '<p class="text-center text-gray-500 text-sm">Пользователь не добавил ссылки</p>';
+                linksContainer.innerHTML = '<p class="text-center text-gray-500 text-sm">Ссылки не добавлены</p>';
             }
         }
 
-        // --- БАЗА ДАННЫХ (FIREBASE) ---
         async function loadProfileFromFirebase(nfcId) {
-            if (!currentUser) return;
+            if (!currentUser) {
+                showToast("Дождитесь авторизации", true);
+                return;
+            }
             showScreen('loading');
             currentNfcId = nfcId;
 
             try {
-                // ПУБЛИЧНЫЙ ПУТЬ СОГЛАСНО ПРАВИЛАМ!
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'nfc_bios', nfcId);
+                // Путь в базе: users/public_bios/id_метки
+                const docRef = doc(db, 'users', 'public_bios', 'nfc_bios', nfcId);
                 const docSnap = await getDoc(docRef);
 
                 if (docSnap.exists()) {
                     profileData = docSnap.data();
                     showToast('Профиль загружен');
                 } else {
-                    // Генерируем уникальное имя для новой метки
-                    profileData.name = `NFC-Кот #${nfcId.substring(0,4)}`;
-                    showToast('Найдена новая, пустая метка!');
+                    profileData.name = `Новый профиль #${nfcId.substring(0,4)}`;
+                    showToast('Метка свободна!');
                 }
 
                 renderProfile();
                 showScreen('profile');
-                
-                // Пробуем запустить музыку автоматически после загрузки (может потребоваться клик)
-                setTimeout(() => playMusic(), 500);
-
             } catch (error) {
-                console.error("Ошибка Firebase:", error);
-                showToast('Ошибка загрузки данных из облака', true);
-                showScreen('scan');
+                console.error("Ошибка чтения Firebase:", error);
+                if (error.code === 'permission-denied') {
+                    showScreen('error');
+                } else {
+                    showToast('Ошибка загрузки из БД', true);
+                    showScreen('scan');
+                }
             }
         }
 
@@ -357,7 +357,6 @@
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Сохранение...';
             
             try {
-                // Сбор данных из формы
                 profileData = {
                     name: document.getElementById('edit-name').value,
                     bio: document.getElementById('edit-bio').value,
@@ -369,54 +368,51 @@
                     updatedAt: new Date().toISOString()
                 };
 
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'nfc_bios', currentNfcId);
+                const docRef = doc(db, 'users', 'public_bios', 'nfc_bios', currentNfcId);
                 await setDoc(docRef, profileData);
 
-                showToast('Профиль успешно сохранен!');
+                showToast('Сохранено в облако!');
                 renderProfile();
                 showScreen('profile');
-                setTimeout(() => playMusic(), 500);
             } catch (error) {
-                console.error("Ошибка сохранения:", error);
-                showToast('Не удалось сохранить изменения', true);
+                console.error("Ошибка записи Firebase:", error);
+                 if (error.code === 'permission-denied') {
+                    showScreen('error');
+                } else {
+                    showToast('Ошибка сохранения', true);
+                }
             } finally {
-                btn.innerHTML = '<i class="fas fa-save mr-2"></i> Сохранить в метку';
+                btn.innerHTML = '<i class="fas fa-save mr-2"></i> Сохранить в облако';
             }
         }
 
-        // --- ЛОГИКА NFC ---
         async function startNfcScan() {
             if (!('NDEFReader' in window)) {
-                showToast('Ваш браузер или устройство не поддерживает чтение NFC.', true);
+                showToast('NFC не поддерживается браузером.', true);
                 return;
             }
             try {
                 const ndef = new NDEFReader();
                 await ndef.scan();
-                showToast('Сканер включен! Приложите метку к телефону.');
+                showToast('Приложите метку к телефону');
                 
                 ndef.onreading = event => {
                     if (event.serialNumber) {
-                        const formattedId = event.serialNumber.replace(/:/g, ''); // убираем двоеточия для чистого ID
+                        const formattedId = event.serialNumber.replace(/:/g, '');
                         loadProfileFromFirebase(formattedId);
                     } else {
-                        showToast('Метка прочитана, но у неё нет серийного номера.', true);
+                        showToast('Невозможно прочитать ID метки', true);
                     }
                 };
             } catch (error) {
-                console.error(error);
-                showToast('Не удалось запустить сканер NFC.', true);
+                showToast('Ошибка доступа к NFC сканеру', true);
             }
         }
 
         function mockScan() {
-            // Фейковый ID для тестирования
-            const mockIds = ["TEST-BIO-A1B2", "TEST-BIO-X9Y8"];
-            const randomId = mockIds[Math.floor(Math.random() * mockIds.length)];
-            loadProfileFromFirebase(randomId);
+            loadProfileFromFirebase("TEST-BIO-777");
         }
 
-        // --- ЗАПОЛНЕНИЕ ФОРМЫ РЕДАКТИРОВАНИЯ ---
         function openEditMode() {
             document.getElementById('edit-name').value = profileData.name || '';
             document.getElementById('edit-bio').value = profileData.bio || '';
@@ -429,30 +425,19 @@
             showScreen('edit');
         }
 
-        // --- ИНИЦИАЛИЗАЦИЯ И AUTH ---
-        async function init() {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (err) {
-                console.error("Auth error:", err);
-                showToast('Ошибка авторизации в базе', true);
+        // Подключение к Firebase
+        signInAnonymously(auth).catch((error) => {
+            console.error("Auth Error:", error);
+            showScreen('error'); // Если анонимная авторизация выключена
+        });
+
+        onAuthStateChanged(auth, user => {
+            currentUser = user;
+            if (user) {
+                showScreen('scan');
             }
+        });
 
-            onAuthStateChanged(auth, user => {
-                currentUser = user;
-                if (user) {
-                    showScreen('scan');
-                } else {
-                    showScreen('loading');
-                }
-            });
-        }
-
-        // --- ОБРАБОТЧИКИ КНОПОК ---
         document.getElementById('btn-scan').addEventListener('click', startNfcScan);
         document.getElementById('btn-mock').addEventListener('click', mockScan);
         document.getElementById('btn-back').addEventListener('click', () => {
@@ -462,12 +447,8 @@
         document.getElementById('btn-edit-mode').addEventListener('click', openEditMode);
         document.getElementById('btn-cancel-edit').addEventListener('click', () => {
             showScreen('profile');
-            setTimeout(() => playMusic(), 500); // Возвращаем музыку
         });
         document.getElementById('btn-save-edit').addEventListener('click', saveProfileToFirebase);
-
-        // Запуск
-        init();
 
     </script>
 </body>
