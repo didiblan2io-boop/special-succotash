@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFC Магазин Приколов</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .screen {
+            display: none;
+        }
+        .screen.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .toast {
+            transition: all 0.3s ease;
+            transform: translateY(100%);
+            opacity: 0;
+        }
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="text-gray-800 min-h-screen flex flex-col items-center p-4 sm:p-8 bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100">
+
+    <!-- Уведомления (Toast) -->
+    <div id="toast" class="toast fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center space-x-2">
+        <i id="toast-icon" class="fas fa-info-circle"></i>
+        <span id="toast-message" class="font-bold">Уведомление</span>
+    </div>
+
+    <div class="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden relative">
+        
+        <!-- Верхняя панель -->
+        <div class="bg-gradient-to-r from-purple-500 to-pink-500 p-6 text-white text-center">
+            <h1 class="text-2xl font-black tracking-wide"><i class="fas fa-store mr-2"></i>NFC Приколы</h1>
+            <p class="text-sm opacity-80 mt-1">Твой карманный магазин</p>
+        </div>
+
+        <!-- Экран загрузки -->
+        <div id="screen-loading" class="screen active p-8 text-center">
+            <i class="fas fa-spinner fa-spin text-4xl text-purple-500 mb-4"></i>
+            <p class="text-lg font-bold">Подключение к базе...</p>
+        </div>
+
+        <!-- Экран сканирования NFC -->
+        <div id="screen-scan" class="screen p-8 text-center">
+            <div class="w-32 h-32 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6 relative">
+                <i class="fas fa-wifi text-5xl text-purple-600 animate-pulse" style="transform: rotate(90deg);"></i>
+            </div>
+            <h2 class="text-xl font-bold mb-2">Приложите NFC-карту</h2>
+            <p class="text-gray-500 text-sm mb-6">Поднесите карту к телефону, чтобы открыть ваш кошелек и инвентарь.</p>
+            
+            <button id="btn-scan-nfc" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition duration-200 mb-4 flex items-center justify-center">
+                <i class="fas fa-mobile-alt mr-2"></i> Читать NFC
+            </button>
+            
+            <div class="relative flex py-2 items-center">
+                <div class="flex-grow border-t border-gray-300"></div>
+                <span class="flex-shrink-0 mx-4 text-gray-400 text-xs">или для теста</span>
+                <div class="flex-grow border-t border-gray-300"></div>
+            </div>
+
+            <button id="btn-mock-nfc" class="w-full mt-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-4 rounded-xl transition duration-200 flex items-center justify-center">
+                <i class="fas fa-magic mr-2"></i> Симулировать NFC
+            </button>
+        </div>
+
+        <!-- Экран магазина -->
+        <div id="screen-store" class="screen bg-gray-50">
+            <!-- Баланс -->
+            <div class="bg-white p-6 shadow-sm border-b border-gray-100 flex justify-between items-center">
+                <div>
+                    <p class="text-xs text-gray-500 font-bold uppercase tracking-wider">Ваш баланс</p>
+                    <div class="flex items-baseline space-x-1">
+                        <span id="ui-balance" class="text-3xl font-black text-gray-800">0</span>
+                        <span class="text-lg font-bold text-purple-600">₽</span>
+                    </div>
+                </div>
+                <div class="bg-purple-100 text-purple-800 px-3 py-1 rounded-lg text-sm font-bold flex items-center">
+                    <i class="fas fa-id-card mr-2"></i>
+                    <span id="ui-nfc-id" class="truncate max-w-[80px]">ID</span>
+                </div>
+            </div>
+
+            <!-- Товары -->
+            <div class="p-6">
+                <h3 class="text-lg font-bold mb-4 text-gray-800">Витрина приколов</h3>
+                <div id="shop-items" class="grid grid-cols-2 gap-4">
+                    <!-- Товары будут добавлены через JS -->
+                </div>
+            </div>
+
+            <!-- Инвентарь -->
+            <div class="p-6 bg-gray-100 border-t border-gray-200">
+                <h3 class="text-lg font-bold mb-4 text-gray-800"><i class="fas fa-box-open mr-2 text-purple-500"></i>Ваши покупки</h3>
+                <div id="inventory-list" class="space-y-3">
+                    <!-- Инвентарь будет добавлен через JS -->
+                    <p class="text-sm text-gray-500 text-center py-4">Вы пока ничего не купили</p>
+                </div>
+            </div>
+
+            <!-- Кнопка выхода -->
+            <div class="p-4 bg-white text-center">
+                <button id="btn-logout" class="text-red-500 font-bold hover:text-red-600 text-sm">
+                    <i class="fas fa-sign-out-alt mr-1"></i> Достать другую карту
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Firebase и Логика приложения -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- КОНФИГУРАЦИЯ И ДАННЫЕ ---
+        const ITEMS = [
+            { id: 'item_1', name: 'Виртуальный Котик', price: 200, icon: 'fa-cat', color: 'text-orange-500', bg: 'bg-orange-100' },
+            { id: 'item_2', name: 'VIP Корона', price: 500, icon: 'fa-crown', color: 'text-yellow-500', bg: 'bg-yellow-100' },
+            { id: 'item_3', name: 'Магический Шар', price: 150, icon: 'fa-crystal-ball', color: 'text-purple-500', bg: 'bg-purple-100' },
+            { id: 'item_4', name: 'Смешные Усы', price: 50, icon: 'fa-user-secret', color: 'text-gray-800', bg: 'bg-gray-200' },
+        ];
+
+        let currentUser = null;
+        let currentWalletId = null;
+        let currentWalletData = null;
+        let unsubscribeWallet = null;
+
+        // Firebase Init
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'nfc-shop-app';
+
+        // --- УПРАВЛЕНИЕ UI ---
+        const screens = {
+            loading: document.getElementById('screen-loading'),
+            scan: document.getElementById('screen-scan'),
+            store: document.getElementById('screen-store')
+        };
+
+        function showScreen(screenName) {
+            Object.values(screens).forEach(s => s.classList.remove('active'));
+            screens[screenName].classList.add('active');
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            const icon = document.getElementById('toast-icon');
+            
+            toastMsg.textContent = message;
+            
+            if (type === 'error') {
+                toast.classList.replace('bg-gray-800', 'bg-red-600');
+                icon.className = 'fas fa-exclamation-triangle';
+            } else if (type === 'success') {
+                toast.classList.replace('bg-gray-800', 'bg-green-600');
+                icon.className = 'fas fa-check-circle';
+            } else {
+                toast.classList.replace('bg-red-600', 'bg-gray-800');
+                toast.classList.replace('bg-green-600', 'bg-gray-800');
+                icon.className = 'fas fa-info-circle';
+            }
+
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // --- РЕНДЕР МАГАЗИНА ---
+        function renderShop() {
+            const container = document.getElementById('shop-items');
+            container.innerHTML = '';
+            
+            ITEMS.forEach(item => {
+                const btn = document.createElement('div');
+                btn.className = `bg-white border-2 border-gray-100 rounded-2xl p-4 text-center cursor-pointer transform transition hover:scale-105 active:scale-95 shadow-sm hover:shadow-md`;
+                btn.innerHTML = `
+                    <div class="w-12 h-12 mx-auto rounded-full ${item.bg} flex items-center justify-center mb-3">
+                        <i class="fas ${item.icon} text-2xl ${item.color}"></i>
+                    </div>
+                    <h4 class="font-bold text-sm leading-tight mb-2 h-8 flex items-center justify-center">${item.name}</h4>
+                    <div class="inline-block bg-gray-100 rounded-lg px-3 py-1 font-black text-purple-600">
+                        ${item.price} ₽
+                    </div>
+                `;
+                btn.onclick = () => buyItem(item);
+                container.appendChild(btn);
+            });
+        }
+
+        function updateWalletUI(data) {
+            currentWalletData = data;
+            
+            // Анимация изменения баланса
+            const balanceEl = document.getElementById('ui-balance');
+            const currentVal = parseInt(balanceEl.textContent) || 0;
+            animateValue(balanceEl, currentVal, data.balance, 500);
+
+            // Обновление инвентаря
+            const inventoryList = document.getElementById('inventory-list');
+            inventoryList.innerHTML = '';
+
+            if (!data.inventory || data.inventory.length === 0) {
+                inventoryList.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">Вы пока ничего не купили. Самое время начать!</p>';
+                return;
+            }
+
+            // Группируем покупки по ID
+            const counts = {};
+            data.inventory.forEach(id => { counts[id] = (counts[id] || 0) + 1; });
+
+            Object.entries(counts).forEach(([itemId, count]) => {
+                const itemDef = ITEMS.find(i => i.id === itemId);
+                if (!itemDef) return;
+
+                const itemEl = document.createElement('div');
+                itemEl.className = 'bg-white p-3 rounded-xl shadow-sm flex items-center justify-between border border-gray-100';
+                itemEl.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-full ${itemDef.bg} flex items-center justify-center">
+                            <i class="fas ${itemDef.icon} ${itemDef.color}"></i>
+                        </div>
+                        <span class="font-bold text-gray-800">${itemDef.name}</span>
+                    </div>
+                    <span class="bg-purple-100 text-purple-800 px-2 py-1 rounded-md text-xs font-bold">x${count}</span>
+                `;
+                inventoryList.appendChild(itemEl);
+            });
+        }
+
+        function animateValue(obj, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                obj.innerHTML = Math.floor(progress * (end - start) + start);
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // --- ЛОГИКА БАЗЫ ДАННЫХ (FIRESTORE) ---
+        async function openWallet(nfcId) {
+            if (!currentUser) return;
+            showScreen('loading');
+            currentWalletId = nfcId;
+            document.getElementById('ui-nfc-id').textContent = nfcId.substring(0, 6) + '...';
+
+            const walletRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'wallets', nfcId);
+            
+            try {
+                const walletSnap = await getDoc(walletRef);
+                if (!walletSnap.exists()) {
+                    // Создаем новый кошелек с 1000 руб
+                    await setDoc(walletRef, {
+                        balance: 1000,
+                        inventory: [],
+                        createdAt: new Date().toISOString()
+                    });
+                    showToast('Новая карта активирована! Вам начислено 1000₽', 'success');
+                }
+
+                if (unsubscribeWallet) unsubscribeWallet();
+
+                // Подписываемся на обновления в реальном времени
+                unsubscribeWallet = onSnapshot(walletRef, (doc) => {
+                    if (doc.exists()) {
+                        updateWalletUI(doc.data());
+                    }
+                }, (error) => {
+                    console.error("Ошибка подписки:", error);
+                    showToast('Ошибка синхронизации данных', 'error');
+                });
+
+                renderShop();
+                showScreen('store');
+
+            } catch (err) {
+                console.error(err);
+                showToast('Ошибка доступа к базе данных', 'error');
+                showScreen('scan');
+            }
+        }
+
+        async function buyItem(item) {
+            if (!currentWalletData || !currentWalletId || !currentUser) return;
+
+            if (currentWalletData.balance < item.price) {
+                showToast(`Недостаточно средств! Нужно ещё ${item.price - currentWalletData.balance}₽`, 'error');
+                return;
+            }
+
+            const walletRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'wallets', currentWalletId);
+            
+            try {
+                const newBalance = currentWalletData.balance - item.price;
+                const newInventory = [...(currentWalletData.inventory || []), item.id];
+                
+                // Оптимистичное обновление UI
+                currentWalletData.balance = newBalance;
+                currentWalletData.inventory = newInventory;
+                updateWalletUI(currentWalletData);
+
+                // Отправка в базу
+                await updateDoc(walletRef, {
+                    balance: newBalance,
+                    inventory: newInventory
+                });
+
+                showToast(`Вы купили "${item.name}"!`, 'success');
+            } catch (err) {
+                console.error(err);
+                showToast('Произошла ошибка при покупке', 'error');
+            }
+        }
+
+        // --- ЛОГИКА NFC ---
+        async function startNfcScan() {
+            if (!('NDEFReader' in window)) {
+                showToast('Web NFC не поддерживается вашим браузером (нужен Android Chrome/Edge). Используйте симуляцию.', 'error');
+                return;
+            }
+
+            try {
+                const ndef = new NDEFReader();
+                await ndef.scan();
+                showToast('Приложите карту к задней панели телефона...', 'info');
+                
+                ndef.onreading = event => {
+                    const serialNumber = event.serialNumber;
+                    if (serialNumber) {
+                        openWallet(serialNumber);
+                        // Для надежности останавливаем чтение после первого успеха (опционально)
+                    } else {
+                        showToast('Не удалось прочитать ID карты', 'error');
+                    }
+                };
+                
+                ndef.onreadingerror = () => {
+                    showToast('Ошибка чтения карты. Попробуйте еще раз.', 'error');
+                };
+
+            } catch (error) {
+                console.error(error);
+                showToast('Нет доступа к NFC. Проверьте разрешения.', 'error');
+            }
+        }
+
+        function simulateNfc() {
+            // Генерируем фейковый ID карты для теста, например, один из двух
+            const fakeIds = ["TEST-CARD-777", "TEST-CARD-888"];
+            const randomId = fakeIds[Math.floor(Math.random() * fakeIds.length)];
+            openWallet(randomId);
+        }
+
+        // --- ИНИЦИАЛИЗАЦИЯ И AUTH ---
+        async function init() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.error("Auth error:", err);
+                showToast('Ошибка авторизации', 'error');
+            }
+
+            onAuthStateChanged(auth, user => {
+                currentUser = user;
+                if (user) {
+                    showScreen('scan');
+                } else {
+                    showScreen('loading');
+                }
+            });
+        }
+
+        // Обработчики кнопок
+        document.getElementById('btn-scan-nfc').addEventListener('click', startNfcScan);
+        document.getElementById('btn-mock-nfc').addEventListener('click', simulateNfc);
+        document.getElementById('btn-logout').addEventListener('click', () => {
+            if (unsubscribeWallet) unsubscribeWallet();
+            currentWalletId = null;
+            currentWalletData = null;
+            showScreen('scan');
+        });
+
+        // Запуск
+        init();
+
+    </script>
+</body>
+</html>
