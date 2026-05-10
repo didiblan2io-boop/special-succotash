@@ -32,13 +32,22 @@
             transform: translateY(0);
             opacity: 1;
         }
+        /* Анимация для использованного предмета */
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .animate-pop {
+            animation: pop 0.3s ease-in-out;
+        }
     </style>
 </head>
 <body class="text-gray-800 min-h-screen flex flex-col items-center p-4 sm:p-8 bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100">
 
-    <div id="toast" class="toast fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center space-x-2">
+    <div id="toast" class="toast fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center space-x-2 max-w-[90%] w-max">
         <i id="toast-icon" class="fas fa-info-circle"></i>
-        <span id="toast-message" class="font-bold">Уведомление</span>
+        <span id="toast-message" class="font-bold text-sm sm:text-base text-center">Уведомление</span>
     </div>
 
     <div class="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden relative">
@@ -76,12 +85,17 @@
         </div>
 
         <div id="screen-store" class="screen bg-gray-50">
-            <div class="bg-white p-6 shadow-sm border-b border-gray-100 flex justify-between items-center">
+            <div class="bg-white p-5 shadow-sm border-b border-gray-100 flex justify-between items-center">
                 <div>
-                    <p class="text-xs text-gray-500 font-bold uppercase tracking-wider">Ваш баланс</p>
-                    <div class="flex items-baseline space-x-1">
-                        <span id="ui-balance" class="text-3xl font-black text-gray-800">0</span>
-                        <span class="text-lg font-bold text-purple-600">₽</span>
+                    <p class="text-xs text-gray-500 font-bold uppercase tracking-wider">Баланс</p>
+                    <div class="flex items-center space-x-2">
+                        <div class="flex items-baseline space-x-1">
+                            <span id="ui-balance" class="text-3xl font-black text-gray-800">0</span>
+                            <span class="text-lg font-bold text-purple-600">₽</span>
+                        </div>
+                        <button onclick="topUpBalance()" class="bg-green-100 hover:bg-green-200 text-green-700 w-8 h-8 rounded-full flex items-center justify-center transition transform active:scale-90" title="Пополнить">
+                            <i class="fas fa-plus"></i>
+                        </button>
                     </div>
                 </div>
                 <div class="bg-purple-100 text-purple-800 px-3 py-1 rounded-lg text-sm font-bold flex items-center">
@@ -91,12 +105,12 @@
             </div>
 
             <div class="p-6">
-                <h3 class="text-lg font-bold mb-4 text-gray-800">Витрина приколов</h3>
+                <h3 class="text-lg font-bold mb-4 text-gray-800">Витрина</h3>
                 <div id="shop-items" class="grid grid-cols-2 gap-4"></div>
             </div>
 
             <div class="p-6 bg-gray-100 border-t border-gray-200">
-                <h3 class="text-lg font-bold mb-4 text-gray-800"><i class="fas fa-box-open mr-2 text-purple-500"></i>Ваши покупки</h3>
+                <h3 class="text-lg font-bold mb-4 text-gray-800"><i class="fas fa-box-open mr-2 text-purple-500"></i>Ваши приколы</h3>
                 <div id="inventory-list" class="space-y-3"></div>
             </div>
 
@@ -110,15 +124,17 @@
     </div>
 
     <script>
+        // Добавили поле actionText для каждого предмета
         const ITEMS = [
-            { id: 'item_1', name: 'Виртуальный Котик', price: 200, icon: 'fa-cat', color: 'text-orange-500', bg: 'bg-orange-100' },
-            { id: 'item_2', name: 'VIP Корона', price: 500, icon: 'fa-crown', color: 'text-yellow-500', bg: 'bg-yellow-100' },
-            { id: 'item_3', name: 'Магический Шар', price: 150, icon: 'fa-crystal-ball', color: 'text-purple-500', bg: 'bg-purple-100' },
-            { id: 'item_4', name: 'Смешные Усы', price: 50, icon: 'fa-user-secret', color: 'text-gray-800', bg: 'bg-gray-200' },
+            { id: 'item_1', name: 'Котик', price: 200, icon: 'fa-cat', color: 'text-orange-500', bg: 'bg-orange-100', actionText: 'Мяу! Вы погладили котика 🐈' },
+            { id: 'item_2', name: 'VIP Корона', price: 500, icon: 'fa-crown', color: 'text-yellow-500', bg: 'bg-yellow-100', actionText: 'Вы надели корону. Вы великолепны! 👑' },
+            { id: 'item_3', name: 'Магия', price: 150, icon: 'fa-hat-wizard', color: 'text-purple-500', bg: 'bg-purple-100', actionText: 'ВЖУХ! Вы применили магию ✨' },
+            { id: 'item_4', name: 'Усы', price: 50, icon: 'fa-user-secret', color: 'text-gray-800', bg: 'bg-gray-200', actionText: 'Вы приклеили усы. Вас не узнать! 🥸' },
         ];
 
         let currentWalletId = null;
         let currentWalletData = null;
+        let toastTimeout = null;
 
         const screens = {
             loading: document.getElementById('screen-loading'),
@@ -140,17 +156,32 @@
             
             if (type === 'error') {
                 toast.classList.replace('bg-gray-800', 'bg-red-600');
+                toast.classList.replace('bg-green-600', 'bg-red-600');
+                toast.classList.replace('bg-purple-600', 'bg-red-600');
                 icon.className = 'fas fa-exclamation-triangle';
             } else if (type === 'success') {
                 toast.classList.replace('bg-gray-800', 'bg-green-600');
+                toast.classList.replace('bg-red-600', 'bg-green-600');
+                toast.classList.replace('bg-purple-600', 'bg-green-600');
                 icon.className = 'fas fa-check-circle';
+            } else if (type === 'action') {
+                toast.classList.replace('bg-gray-800', 'bg-purple-600');
+                toast.classList.replace('bg-red-600', 'bg-purple-600');
+                toast.classList.replace('bg-green-600', 'bg-purple-600');
+                icon.className = 'fas fa-star';
+            } else {
+                toast.className = 'toast fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center space-x-2 max-w-[90%] w-max';
+                icon.className = 'fas fa-info-circle';
             }
 
             toast.classList.add('show');
-            setTimeout(() => {
+            
+            if(toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
                 toast.classList.remove('show');
-                toast.classList.replace('bg-red-600', 'bg-gray-800');
-                toast.classList.replace('bg-green-600', 'bg-gray-800');
+                setTimeout(() => {
+                    toast.className = 'toast fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center space-x-2 max-w-[90%] w-max';
+                }, 300);
             }, 3000);
         }
 
@@ -173,7 +204,12 @@
         }
 
         function updateWalletUI(data) {
-            document.getElementById('ui-balance').textContent = data.balance;
+            // Анимация изменения баланса
+            const balanceEl = document.getElementById('ui-balance');
+            balanceEl.classList.add('animate-pop');
+            setTimeout(() => balanceEl.classList.remove('animate-pop'), 300);
+            balanceEl.textContent = data.balance;
+
             const inventoryList = document.getElementById('inventory-list');
             inventoryList.innerHTML = '';
 
@@ -188,14 +224,21 @@
             Object.entries(counts).forEach(([itemId, count]) => {
                 const itemDef = ITEMS.find(i => i.id === itemId);
                 if (!itemDef) return;
+                
                 const itemEl = document.createElement('div');
-                itemEl.className = 'bg-white p-3 rounded-xl shadow-sm flex items-center justify-between border border-gray-100';
+                // Сделали предметы кликабельными
+                itemEl.className = 'bg-white p-3 rounded-xl shadow-sm flex items-center justify-between border border-gray-200 cursor-pointer hover:bg-gray-50 transition transform active:scale-[0.98] select-none';
+                itemEl.onclick = () => useItem(itemId);
+                
                 itemEl.innerHTML = `
                     <div class="flex items-center space-x-3">
                         <div class="w-10 h-10 rounded-full ${itemDef.bg} flex items-center justify-center">
                             <i class="fas ${itemDef.icon} ${itemDef.color}"></i>
                         </div>
-                        <span class="font-bold text-gray-800">${itemDef.name}</span>
+                        <div class="flex flex-col">
+                            <span class="font-bold text-gray-800 leading-tight">${itemDef.name}</span>
+                            <span class="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Нажми, чтобы юзнуть</span>
+                        </div>
                     </div>
                     <span class="bg-purple-100 text-purple-800 px-2 py-1 rounded-md text-xs font-bold">x${count}</span>
                 `;
@@ -207,7 +250,6 @@
             currentWalletId = nfcId;
             document.getElementById('ui-nfc-id').textContent = nfcId.substring(0, 6) + '...';
             
-            // Читаем из памяти браузера
             let savedData = localStorage.getItem('wallet_' + nfcId);
             if (savedData) {
                 currentWalletData = JSON.parse(savedData);
@@ -232,11 +274,34 @@
             currentWalletData.balance -= item.price;
             currentWalletData.inventory.push(item.id);
             
-            // Сохраняем в память
             localStorage.setItem('wallet_' + currentWalletId, JSON.stringify(currentWalletData));
-            
             updateWalletUI(currentWalletData);
             showToast(`Вы купили "${item.name}"!`, 'success');
+        }
+
+        // НОВАЯ ФУНКЦИЯ: Пополнение баланса
+        function topUpBalance() {
+            currentWalletData.balance += 500;
+            localStorage.setItem('wallet_' + currentWalletId, JSON.stringify(currentWalletData));
+            updateWalletUI(currentWalletData);
+            showToast('+ 500₽ на ваш счет!', 'success');
+        }
+
+        // НОВАЯ ФУНКЦИЯ: Использование предмета
+        function useItem(itemId) {
+            const itemDef = ITEMS.find(i => i.id === itemId);
+            if (!itemDef) return;
+
+            // Ищем первый такой предмет в инвентаре и удаляем его (тратим)
+            const index = currentWalletData.inventory.indexOf(itemId);
+            if (index > -1) {
+                currentWalletData.inventory.splice(index, 1);
+                localStorage.setItem('wallet_' + currentWalletId, JSON.stringify(currentWalletData));
+                
+                updateWalletUI(currentWalletData);
+                // Показываем смешной текст при использовании
+                showToast(itemDef.actionText, 'action');
+            }
         }
 
         async function startNfcScan() {
@@ -266,7 +331,6 @@
             openWallet(randomId);
         }
 
-        // Запуск (сразу показываем экран сканирования)
         setTimeout(() => showScreen('scan'), 500);
 
         document.getElementById('btn-scan-nfc').addEventListener('click', startNfcScan);
