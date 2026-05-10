@@ -3,343 +3,472 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFC Магазин Приколов</title>
+    <title>Моя NFC Визитка</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap');
         body {
-            font-family: 'Nunito', sans-serif;
-            background-color: #f3f4f6;
+            font-family: 'Montserrat', sans-serif;
+            background-color: #111827;
+            color: white;
+            overflow-x: hidden;
         }
         .screen {
             display: none;
+            min-height: 100vh;
+            width: 100%;
+            flex-direction: column;
+            align-items: center;
         }
         .screen.active {
-            display: block;
-            animation: fadeIn 0.3s ease-in-out;
+            display: flex;
+            animation: fadeIn 0.4s ease-out;
         }
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
         }
-        .toast {
-            transition: all 0.3s ease;
-            transform: translateY(100%);
-            opacity: 0;
+        /* Анимация вращения пластинки */
+        .record-spin {
+            animation: spin 3s linear infinite;
         }
-        .toast.show {
-            transform: translateY(0);
-            opacity: 1;
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        /* Анимация для использованного предмета */
-        @keyframes pop {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-        .animate-pop {
-            animation: pop 0.3s ease-in-out;
-        }
+        
+        /* Скрываем скроллбар */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
-<body class="text-gray-800 min-h-screen flex flex-col items-center p-4 sm:p-8 bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100">
+<body class="bg-gradient-to-br from-gray-900 via-purple-900 to-black">
 
-    <div id="toast" class="toast fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center space-x-2 max-w-[90%] w-max">
+    <!-- Аудио плеер -->
+    <audio id="bg-music" loop preload="auto"></audio>
+
+    <!-- Уведомления -->
+    <div id="toast" class="fixed top-5 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-2xl z-50 transition-all duration-300 -translate-y-24 opacity-0 flex items-center space-x-2">
         <i id="toast-icon" class="fas fa-info-circle"></i>
-        <span id="toast-message" class="font-bold text-sm sm:text-base text-center">Уведомление</span>
+        <span id="toast-message" class="font-bold text-sm"></span>
     </div>
 
-    <div class="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden relative">
+    <!-- ЭКРАН ЗАГРУЗКИ / ИНИЦИАЛИЗАЦИИ FIRESTORE -->
+    <div id="screen-loading" class="screen active justify-center">
+        <i class="fas fa-circle-notch fa-spin text-5xl text-purple-500 mb-4"></i>
+        <p class="text-xl font-bold animate-pulse">Подключение к матрице...</p>
+    </div>
+
+    <!-- ЭКРАН СКАНИРОВАНИЯ -->
+    <div id="screen-scan" class="screen justify-center p-6 text-center">
+        <div class="mb-8 relative">
+            <div class="absolute inset-0 bg-purple-500 rounded-full blur-xl opacity-50 animate-pulse"></div>
+            <div class="w-40 h-40 glass-panel rounded-full flex items-center justify-center relative z-10 mx-auto">
+                <i class="fas fa-nfc-symbol text-7xl text-white"></i>
+            </div>
+        </div>
         
-        <div class="bg-gradient-to-r from-purple-500 to-pink-500 p-6 text-white text-center">
-            <h1 class="text-2xl font-black tracking-wide"><i class="fas fa-store mr-2"></i>NFC Приколы</h1>
-            <p class="text-sm opacity-80 mt-1">Твой карманный магазин</p>
-        </div>
+        <h1 class="text-3xl font-extrabold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
+            NFC Визитка
+        </h1>
+        <p class="text-gray-300 mb-10 max-w-xs mx-auto">Приложите метку к телефону, чтобы открыть профиль.</p>
 
-        <div id="screen-loading" class="screen p-8 text-center active">
-            <i class="fas fa-spinner fa-spin text-4xl text-purple-500 mb-4"></i>
-            <p class="text-lg font-bold">Загрузка...</p>
-        </div>
+        <button id="btn-scan" class="w-full max-w-sm bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold py-4 px-8 rounded-2xl shadow-lg shadow-purple-500/30 transition transform hover:scale-105 active:scale-95 mb-4 text-lg">
+            <i class="fas fa-wifi mr-2"></i> Читать метку
+        </button>
 
-        <div id="screen-scan" class="screen p-8 text-center">
-            <div class="w-32 h-32 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6 relative">
-                <i class="fas fa-wifi text-5xl text-purple-600 animate-pulse" style="transform: rotate(90deg);"></i>
-            </div>
-            <h2 class="text-xl font-bold mb-2">Приложите NFC-карту</h2>
-            <p class="text-gray-500 text-sm mb-6">Поднесите карту к телефону, чтобы открыть ваш кошелек и инвентарь.</p>
-            
-            <button id="btn-scan-nfc" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition duration-200 mb-4 flex items-center justify-center">
-                <i class="fas fa-mobile-alt mr-2"></i> Читать NFC
+        <button id="btn-mock" class="w-full max-w-sm glass-panel text-white font-semibold py-3 px-8 rounded-2xl transition transform hover:scale-105 active:scale-95 text-sm opacity-80 hover:opacity-100">
+            <i class="fas fa-flask mr-2"></i> Тестовый профиль
+        </button>
+    </div>
+
+    <!-- ЭКРАН ПРОФИЛЯ -->
+    <div id="screen-profile" class="screen p-4 sm:p-6 max-w-md mx-auto relative pb-24">
+        <!-- Кнопка редактирования и выхода -->
+        <div class="w-full flex justify-between items-center mb-6 pt-2">
+            <button id="btn-back" class="glass-panel w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/20 transition">
+                <i class="fas fa-chevron-left"></i>
             </button>
-            
-            <div class="relative flex py-2 items-center">
-                <div class="flex-grow border-t border-gray-300"></div>
-                <span class="flex-shrink-0 mx-4 text-gray-400 text-xs">или для теста</span>
-                <div class="flex-grow border-t border-gray-300"></div>
-            </div>
-
-            <button id="btn-mock-nfc" class="w-full mt-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-4 rounded-xl transition duration-200 flex items-center justify-center">
-                <i class="fas fa-magic mr-2"></i> Симулировать NFC
+            <button id="btn-edit-mode" class="glass-panel px-4 py-2 rounded-full text-sm font-bold hover:bg-white/20 transition flex items-center">
+                <i class="fas fa-pen mr-2 text-pink-400"></i> Редактировать
             </button>
         </div>
 
-        <div id="screen-store" class="screen bg-gray-50">
-            <div class="bg-white p-5 shadow-sm border-b border-gray-100 flex justify-between items-center">
-                <div>
-                    <p class="text-xs text-gray-500 font-bold uppercase tracking-wider">Баланс</p>
-                    <div class="flex items-center space-x-2">
-                        <div class="flex items-baseline space-x-1">
-                            <span id="ui-balance" class="text-3xl font-black text-gray-800">0</span>
-                            <span class="text-lg font-bold text-purple-600">₽</span>
-                        </div>
-                        <button onclick="topUpBalance()" class="bg-green-100 hover:bg-green-200 text-green-700 w-8 h-8 rounded-full flex items-center justify-center transition transform active:scale-90" title="Пополнить">
-                            <i class="fas fa-plus"></i>
-                        </button>
+        <!-- Аватарка -->
+        <div class="relative mb-6">
+            <div class="absolute inset-0 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-full blur-md opacity-70"></div>
+            <img id="profile-photo" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Avatar" class="w-32 h-32 rounded-full border-4 border-gray-900 relative z-10 object-cover bg-gray-800">
+        </div>
+
+        <!-- Инфо -->
+        <h2 id="profile-name" class="text-2xl font-extrabold text-center mb-2">Имя Пользователя</h2>
+        <p id="profile-bio" class="text-center text-gray-300 text-sm mb-8 px-4 leading-relaxed">Здесь будет ваше красивое описание, статус или просто пара слов о себе.</p>
+
+        <!-- Ссылки -->
+        <div class="w-full space-y-4" id="links-container">
+            <!-- Ссылки рендерятся через JS -->
+        </div>
+
+        <!-- Музыкальный плеер (плавающий снизу) -->
+        <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 glass-panel rounded-full px-6 py-3 flex items-center space-x-4 shadow-2xl z-40 w-max max-w-[90%] border-t border-white/20">
+            <div class="relative w-10 h-10 flex-shrink-0">
+                <div id="music-disc" class="w-full h-full rounded-full bg-black border-2 border-gray-600 flex items-center justify-center">
+                    <div class="w-3 h-3 bg-purple-500 rounded-full"></div>
+                </div>
+            </div>
+            <div class="flex flex-col max-w-[120px] sm:max-w-[180px]">
+                <span class="text-xs font-bold text-pink-400">Сейчас играет</span>
+                <span class="text-xs text-gray-300 truncate" id="music-title">Музыка профиля</span>
+            </div>
+            <button id="btn-play-pause" class="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 transition flex-shrink-0">
+                <i class="fas fa-play" id="play-icon"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- ЭКРАН РЕДАКТИРОВАНИЯ -->
+    <div id="screen-edit" class="screen p-4 sm:p-6 max-w-md mx-auto">
+        <div class="w-full flex justify-between items-center mb-6 pt-2">
+            <h2 class="text-xl font-bold">Настройки Bio</h2>
+            <button id="btn-cancel-edit" class="text-gray-400 hover:text-white">Отмена</button>
+        </div>
+
+        <div class="w-full space-y-4 pb-10">
+            <div>
+                <label class="text-xs text-pink-400 font-bold uppercase">Имя / Никнейм</label>
+                <input type="text" id="edit-name" class="w-full bg-gray-800 text-white rounded-xl px-4 py-3 mt-1 outline-none focus:ring-2 focus:ring-purple-500 border border-gray-700">
+            </div>
+            
+            <div>
+                <label class="text-xs text-pink-400 font-bold uppercase">О себе (Bio)</label>
+                <textarea id="edit-bio" rows="3" class="w-full bg-gray-800 text-white rounded-xl px-4 py-3 mt-1 outline-none focus:ring-2 focus:ring-purple-500 border border-gray-700"></textarea>
+            </div>
+
+            <div>
+                <label class="text-xs text-pink-400 font-bold uppercase">Ссылка на фото (URL)</label>
+                <input type="text" id="edit-photo" placeholder="https://..." class="w-full bg-gray-800 text-white rounded-xl px-4 py-3 mt-1 outline-none focus:ring-2 focus:ring-purple-500 border border-gray-700 text-sm">
+            </div>
+
+            <div>
+                <label class="text-xs text-pink-400 font-bold uppercase">Ссылка на музыку (MP3/URL)</label>
+                <input type="text" id="edit-music" placeholder="Оставьте пустым для стандарта" class="w-full bg-gray-800 text-white rounded-xl px-4 py-3 mt-1 outline-none focus:ring-2 focus:ring-purple-500 border border-gray-700 text-sm">
+                <p class="text-[10px] text-gray-400 mt-1">Поддерживаются прямые ссылки на .mp3 файлы</p>
+            </div>
+
+            <div class="pt-4 border-t border-gray-700">
+                <h3 class="text-sm font-bold text-gray-300 mb-3">Социальные сети</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center space-x-3 bg-gray-800 rounded-xl px-4 py-2 border border-gray-700">
+                        <i class="fab fa-telegram text-blue-400 text-xl"></i>
+                        <input type="text" id="edit-tg" placeholder="Имя пользователя (без @) или ссылка" class="w-full bg-transparent text-white outline-none text-sm">
+                    </div>
+                    <div class="flex items-center space-x-3 bg-gray-800 rounded-xl px-4 py-2 border border-gray-700">
+                        <i class="fab fa-vk text-blue-500 text-xl"></i>
+                        <input type="text" id="edit-vk" placeholder="Ссылка на страницу" class="w-full bg-transparent text-white outline-none text-sm">
+                    </div>
+                    <div class="flex items-center space-x-3 bg-gray-800 rounded-xl px-4 py-2 border border-gray-700">
+                        <i class="fab fa-youtube text-red-500 text-xl"></i>
+                        <input type="text" id="edit-yt" placeholder="Ссылка на канал" class="w-full bg-transparent text-white outline-none text-sm">
                     </div>
                 </div>
-                <div class="bg-purple-100 text-purple-800 px-3 py-1 rounded-lg text-sm font-bold flex items-center">
-                    <i class="fas fa-id-card mr-2"></i>
-                    <span id="ui-nfc-id" class="truncate max-w-[80px]">ID</span>
-                </div>
             </div>
 
-            <div class="p-6">
-                <h3 class="text-lg font-bold mb-4 text-gray-800">Витрина</h3>
-                <div id="shop-items" class="grid grid-cols-2 gap-4"></div>
-            </div>
-
-            <div class="p-6 bg-gray-100 border-t border-gray-200">
-                <h3 class="text-lg font-bold mb-4 text-gray-800"><i class="fas fa-box-open mr-2 text-purple-500"></i>Ваши приколы</h3>
-                <div id="inventory-list" class="space-y-3"></div>
-            </div>
-
-            <div class="p-4 bg-white text-center">
-                <button id="btn-logout" class="text-red-500 font-bold hover:text-red-600 text-sm">
-                    <i class="fas fa-sign-out-alt mr-1"></i> Достать другую карту
-                </button>
-            </div>
+            <button id="btn-save-edit" class="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-bold py-4 px-8 rounded-xl shadow-lg mt-6 transition transform active:scale-95">
+                <i class="fas fa-save mr-2"></i> Сохранить в метку
+            </button>
         </div>
-
     </div>
 
-    <script>
-        // Добавили поле actionText для каждого предмета
-        const ITEMS = [
-            { id: 'item_1', name: 'Котик', price: 200, icon: 'fa-cat', color: 'text-orange-500', bg: 'bg-orange-100', actionText: 'Мяу! Вы погладили котика 🐈' },
-            { id: 'item_2', name: 'VIP Корона', price: 500, icon: 'fa-crown', color: 'text-yellow-500', bg: 'bg-yellow-100', actionText: 'Вы надели корону. Вы великолепны! 👑' },
-            { id: 'item_3', name: 'Магия', price: 150, icon: 'fa-hat-wizard', color: 'text-purple-500', bg: 'bg-purple-100', actionText: 'ВЖУХ! Вы применили магию ✨' },
-            { id: 'item_4', name: 'Усы', price: 50, icon: 'fa-user-secret', color: 'text-gray-800', bg: 'bg-gray-200', actionText: 'Вы приклеили усы. Вас не узнать! 🥸' },
-        ];
+    <!-- FIREBASE AND APP LOGIC -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        let currentWalletId = null;
-        let currentWalletData = null;
-        let toastTimeout = null;
+        // Конфигурация Firebase
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'nfc-bio-app';
+
+        // Состояние
+        let currentUser = null;
+        let currentNfcId = null;
+        let isPlaying = false;
+        
+        // Стандартные данные для новой метки
+        const DEFAULT_MUSIC = "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3"; 
+        
+        let profileData = {
+            name: "Анонимный Кот",
+            bio: "Я только что привязал эту NFC метку. Мой профиль еще пуст, но скоро здесь будет круто!",
+            photoUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=NFC",
+            musicUrl: DEFAULT_MUSIC,
+            tgLink: "",
+            vkLink: "",
+            ytLink: ""
+        };
 
         const screens = {
             loading: document.getElementById('screen-loading'),
             scan: document.getElementById('screen-scan'),
-            store: document.getElementById('screen-store')
+            profile: document.getElementById('screen-profile'),
+            edit: document.getElementById('screen-edit')
         };
 
-        function showScreen(screenName) {
+        const audio = document.getElementById('bg-music');
+        const playBtn = document.getElementById('btn-play-pause');
+        const playIcon = document.getElementById('play-icon');
+        const disc = document.getElementById('music-disc');
+
+        // --- УТИЛИТЫ ---
+        function showScreen(name) {
             Object.values(screens).forEach(s => s.classList.remove('active'));
-            screens[screenName].classList.add('active');
+            screens[name].classList.add('active');
+            if(name !== 'profile') pauseMusic(); // Останавливаем музыку, если ушли с профиля
         }
 
-        function showToast(message, type = 'info') {
-            const toast = document.getElementById('toast');
-            const toastMsg = document.getElementById('toast-message');
-            const icon = document.getElementById('toast-icon');
-            
-            toastMsg.textContent = message;
-            
-            if (type === 'error') {
-                toast.classList.replace('bg-gray-800', 'bg-red-600');
-                toast.classList.replace('bg-green-600', 'bg-red-600');
-                toast.classList.replace('bg-purple-600', 'bg-red-600');
-                icon.className = 'fas fa-exclamation-triangle';
-            } else if (type === 'success') {
-                toast.classList.replace('bg-gray-800', 'bg-green-600');
-                toast.classList.replace('bg-red-600', 'bg-green-600');
-                toast.classList.replace('bg-purple-600', 'bg-green-600');
-                icon.className = 'fas fa-check-circle';
-            } else if (type === 'action') {
-                toast.classList.replace('bg-gray-800', 'bg-purple-600');
-                toast.classList.replace('bg-red-600', 'bg-purple-600');
-                toast.classList.replace('bg-green-600', 'bg-purple-600');
-                icon.className = 'fas fa-star';
-            } else {
-                toast.className = 'toast fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center space-x-2 max-w-[90%] w-max';
-                icon.className = 'fas fa-info-circle';
-            }
-
-            toast.classList.add('show');
-            
-            if(toastTimeout) clearTimeout(toastTimeout);
-            toastTimeout = setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => {
-                    toast.className = 'toast fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center space-x-2 max-w-[90%] w-max';
-                }, 300);
+        function showToast(msg, isError = false) {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-message').textContent = msg;
+            t.className = `fixed top-5 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-50 transition-all duration-300 flex items-center space-x-2 ${isError ? 'bg-red-600 text-white' : 'bg-green-500 text-white'}`;
+            t.style.transform = "translate(-50%, 0)";
+            t.style.opacity = "1";
+            setTimeout(() => {
+                t.style.transform = "translate(-50%, -100px)";
+                t.style.opacity = "0";
             }, 3000);
         }
 
-        function renderShop() {
-            const container = document.getElementById('shop-items');
-            container.innerHTML = '';
-            ITEMS.forEach(item => {
-                const btn = document.createElement('div');
-                btn.className = `bg-white border-2 border-gray-100 rounded-2xl p-4 text-center cursor-pointer transform transition hover:scale-105 active:scale-95 shadow-sm hover:shadow-md`;
-                btn.innerHTML = `
-                    <div class="w-12 h-12 mx-auto rounded-full ${item.bg} flex items-center justify-center mb-3">
-                        <i class="fas ${item.icon} text-2xl ${item.color}"></i>
-                    </div>
-                    <h4 class="font-bold text-sm leading-tight mb-2 h-8 flex items-center justify-center">${item.name}</h4>
-                    <div class="inline-block bg-gray-100 rounded-lg px-3 py-1 font-black text-purple-600">${item.price} ₽</div>
-                `;
-                btn.onclick = () => buyItem(item);
-                container.appendChild(btn);
+        // --- ЛОГИКА МУЗЫКИ ---
+        function toggleMusic() {
+            if(isPlaying) pauseMusic();
+            else playMusic();
+        }
+
+        function playMusic() {
+            audio.play().then(() => {
+                isPlaying = true;
+                playIcon.className = "fas fa-pause";
+                disc.classList.add('record-spin');
+            }).catch(e => {
+                console.log("Автозапуск заблокирован браузером. Ждем клика пользователя.", e);
+                isPlaying = false;
+                playIcon.className = "fas fa-play";
+                disc.classList.remove('record-spin');
             });
         }
 
-        function updateWalletUI(data) {
-            // Анимация изменения баланса
-            const balanceEl = document.getElementById('ui-balance');
-            balanceEl.classList.add('animate-pop');
-            setTimeout(() => balanceEl.classList.remove('animate-pop'), 300);
-            balanceEl.textContent = data.balance;
+        function pauseMusic() {
+            audio.pause();
+            isPlaying = false;
+            playIcon.className = "fas fa-play ml-1";
+            disc.classList.remove('record-spin');
+        }
 
-            const inventoryList = document.getElementById('inventory-list');
-            inventoryList.innerHTML = '';
+        playBtn.addEventListener('click', toggleMusic);
 
-            if (!data.inventory || data.inventory.length === 0) {
-                inventoryList.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">Вы пока ничего не купили</p>';
-                return;
-            }
+        // --- ОТРИСОВКА ПРОФИЛЯ ---
+        function renderProfile() {
+            document.getElementById('profile-name').textContent = profileData.name || "Без имени";
+            document.getElementById('profile-bio').textContent = profileData.bio || "";
+            document.getElementById('profile-photo').src = profileData.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentNfcId}`;
+            
+            // Настройка музыки
+            audio.src = profileData.musicUrl || DEFAULT_MUSIC;
+            audio.load();
+            
+            // Отрисовка соцсетей
+            const linksContainer = document.getElementById('links-container');
+            linksContainer.innerHTML = '';
 
-            const counts = {};
-            data.inventory.forEach(id => { counts[id] = (counts[id] || 0) + 1; });
+            const createLinkBtn = (url, icon, color, text) => {
+                if(!url) return;
+                // Форматируем ссылку TG, если ввели просто ник
+                let finalUrl = url;
+                if(icon.includes('telegram') && !url.includes('http')) {
+                    finalUrl = `https://t.me/${url.replace('@', '')}`;
+                }
 
-            Object.entries(counts).forEach(([itemId, count]) => {
-                const itemDef = ITEMS.find(i => i.id === itemId);
-                if (!itemDef) return;
-                
-                const itemEl = document.createElement('div');
-                // Сделали предметы кликабельными
-                itemEl.className = 'bg-white p-3 rounded-xl shadow-sm flex items-center justify-between border border-gray-200 cursor-pointer hover:bg-gray-50 transition transform active:scale-[0.98] select-none';
-                itemEl.onclick = () => useItem(itemId);
-                
-                itemEl.innerHTML = `
-                    <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 rounded-full ${itemDef.bg} flex items-center justify-center">
-                            <i class="fas ${itemDef.icon} ${itemDef.color}"></i>
-                        </div>
-                        <div class="flex flex-col">
-                            <span class="font-bold text-gray-800 leading-tight">${itemDef.name}</span>
-                            <span class="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Нажми, чтобы юзнуть</span>
-                        </div>
+                const a = document.createElement('a');
+                a.href = finalUrl;
+                a.target = "_blank";
+                a.className = `glass-panel w-full flex items-center p-4 rounded-2xl hover:bg-white/10 transition transform active:scale-95 group`;
+                a.innerHTML = `
+                    <div class="w-10 h-10 rounded-full ${color} flex items-center justify-center mr-4 group-hover:scale-110 transition">
+                        <i class="${icon} text-white text-xl"></i>
                     </div>
-                    <span class="bg-purple-100 text-purple-800 px-2 py-1 rounded-md text-xs font-bold">x${count}</span>
+                    <span class="font-bold text-gray-200">${text}</span>
+                    <i class="fas fa-external-link-alt ml-auto text-gray-500 text-sm"></i>
                 `;
-                inventoryList.appendChild(itemEl);
-            });
-        }
+                linksContainer.appendChild(a);
+            };
 
-        function openWallet(nfcId) {
-            currentWalletId = nfcId;
-            document.getElementById('ui-nfc-id').textContent = nfcId.substring(0, 6) + '...';
-            
-            let savedData = localStorage.getItem('wallet_' + nfcId);
-            if (savedData) {
-                currentWalletData = JSON.parse(savedData);
-                showToast('Данные карты успешно загружены', 'success');
-            } else {
-                currentWalletData = { balance: 1000, inventory: [] };
-                localStorage.setItem('wallet_' + nfcId, JSON.stringify(currentWalletData));
-                showToast('Новая карта! Вам начислено 1000₽', 'success');
+            createLinkBtn(profileData.tgLink, 'fab fa-telegram', 'bg-blue-500', 'Telegram');
+            createLinkBtn(profileData.vkLink, 'fab fa-vk', 'bg-blue-600', 'ВКонтакте');
+            createLinkBtn(profileData.ytLink, 'fab fa-youtube', 'bg-red-600', 'YouTube');
+
+            if(linksContainer.innerHTML === '') {
+                linksContainer.innerHTML = '<p class="text-center text-gray-500 text-sm">Пользователь не добавил ссылки</p>';
             }
-
-            updateWalletUI(currentWalletData);
-            renderShop();
-            showScreen('store');
         }
 
-        function buyItem(item) {
-            if (currentWalletData.balance < item.price) {
-                showToast(`Недостаточно средств!`, 'error');
-                return;
-            }
-            
-            currentWalletData.balance -= item.price;
-            currentWalletData.inventory.push(item.id);
-            
-            localStorage.setItem('wallet_' + currentWalletId, JSON.stringify(currentWalletData));
-            updateWalletUI(currentWalletData);
-            showToast(`Вы купили "${item.name}"!`, 'success');
-        }
+        // --- БАЗА ДАННЫХ (FIREBASE) ---
+        async function loadProfileFromFirebase(nfcId) {
+            if (!currentUser) return;
+            showScreen('loading');
+            currentNfcId = nfcId;
 
-        // НОВАЯ ФУНКЦИЯ: Пополнение баланса
-        function topUpBalance() {
-            currentWalletData.balance += 500;
-            localStorage.setItem('wallet_' + currentWalletId, JSON.stringify(currentWalletData));
-            updateWalletUI(currentWalletData);
-            showToast('+ 500₽ на ваш счет!', 'success');
-        }
+            try {
+                // ПУБЛИЧНЫЙ ПУТЬ СОГЛАСНО ПРАВИЛАМ!
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'nfc_bios', nfcId);
+                const docSnap = await getDoc(docRef);
 
-        // НОВАЯ ФУНКЦИЯ: Использование предмета
-        function useItem(itemId) {
-            const itemDef = ITEMS.find(i => i.id === itemId);
-            if (!itemDef) return;
+                if (docSnap.exists()) {
+                    profileData = docSnap.data();
+                    showToast('Профиль загружен');
+                } else {
+                    // Генерируем уникальное имя для новой метки
+                    profileData.name = `NFC-Кот #${nfcId.substring(0,4)}`;
+                    showToast('Найдена новая, пустая метка!');
+                }
 
-            // Ищем первый такой предмет в инвентаре и удаляем его (тратим)
-            const index = currentWalletData.inventory.indexOf(itemId);
-            if (index > -1) {
-                currentWalletData.inventory.splice(index, 1);
-                localStorage.setItem('wallet_' + currentWalletId, JSON.stringify(currentWalletData));
+                renderProfile();
+                showScreen('profile');
                 
-                updateWalletUI(currentWalletData);
-                // Показываем смешной текст при использовании
-                showToast(itemDef.actionText, 'action');
+                // Пробуем запустить музыку автоматически после загрузки (может потребоваться клик)
+                setTimeout(() => playMusic(), 500);
+
+            } catch (error) {
+                console.error("Ошибка Firebase:", error);
+                showToast('Ошибка загрузки данных из облака', true);
+                showScreen('scan');
             }
         }
 
+        async function saveProfileToFirebase() {
+            if (!currentUser || !currentNfcId) return;
+            
+            const btn = document.getElementById('btn-save-edit');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Сохранение...';
+            
+            try {
+                // Сбор данных из формы
+                profileData = {
+                    name: document.getElementById('edit-name').value,
+                    bio: document.getElementById('edit-bio').value,
+                    photoUrl: document.getElementById('edit-photo').value,
+                    musicUrl: document.getElementById('edit-music').value,
+                    tgLink: document.getElementById('edit-tg').value,
+                    vkLink: document.getElementById('edit-vk').value,
+                    ytLink: document.getElementById('edit-yt').value,
+                    updatedAt: new Date().toISOString()
+                };
+
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'nfc_bios', currentNfcId);
+                await setDoc(docRef, profileData);
+
+                showToast('Профиль успешно сохранен!');
+                renderProfile();
+                showScreen('profile');
+                setTimeout(() => playMusic(), 500);
+            } catch (error) {
+                console.error("Ошибка сохранения:", error);
+                showToast('Не удалось сохранить изменения', true);
+            } finally {
+                btn.innerHTML = '<i class="fas fa-save mr-2"></i> Сохранить в метку';
+            }
+        }
+
+        // --- ЛОГИКА NFC ---
         async function startNfcScan() {
             if (!('NDEFReader' in window)) {
-                showToast('NFC не поддерживается. Откройте в Chrome на Android.', 'error');
+                showToast('Ваш браузер или устройство не поддерживает чтение NFC.', true);
                 return;
             }
             try {
                 const ndef = new NDEFReader();
                 await ndef.scan();
-                showToast('Приложите карту к телефону...', 'info');
+                showToast('Сканер включен! Приложите метку к телефону.');
+                
                 ndef.onreading = event => {
                     if (event.serialNumber) {
-                        openWallet(event.serialNumber);
+                        const formattedId = event.serialNumber.replace(/:/g, ''); // убираем двоеточия для чистого ID
+                        loadProfileFromFirebase(formattedId);
                     } else {
-                        showToast('Не удалось прочитать ID', 'error');
+                        showToast('Метка прочитана, но у неё нет серийного номера.', true);
                     }
                 };
             } catch (error) {
-                showToast('Нет доступа к NFC', 'error');
+                console.error(error);
+                showToast('Не удалось запустить сканер NFC.', true);
             }
         }
 
-        function simulateNfc() {
-            const fakeIds = ["TEST-CARD-777", "TEST-CARD-888"];
-            const randomId = fakeIds[Math.floor(Math.random() * fakeIds.length)];
-            openWallet(randomId);
+        function mockScan() {
+            // Фейковый ID для тестирования
+            const mockIds = ["TEST-BIO-A1B2", "TEST-BIO-X9Y8"];
+            const randomId = mockIds[Math.floor(Math.random() * mockIds.length)];
+            loadProfileFromFirebase(randomId);
         }
 
-        setTimeout(() => showScreen('scan'), 500);
+        // --- ЗАПОЛНЕНИЕ ФОРМЫ РЕДАКТИРОВАНИЯ ---
+        function openEditMode() {
+            document.getElementById('edit-name').value = profileData.name || '';
+            document.getElementById('edit-bio').value = profileData.bio || '';
+            document.getElementById('edit-photo').value = profileData.photoUrl || '';
+            document.getElementById('edit-music').value = profileData.musicUrl === DEFAULT_MUSIC ? '' : (profileData.musicUrl || '');
+            document.getElementById('edit-tg').value = profileData.tgLink || '';
+            document.getElementById('edit-vk').value = profileData.vkLink || '';
+            document.getElementById('edit-yt').value = profileData.ytLink || '';
+            
+            showScreen('edit');
+        }
 
-        document.getElementById('btn-scan-nfc').addEventListener('click', startNfcScan);
-        document.getElementById('btn-mock-nfc').addEventListener('click', simulateNfc);
-        document.getElementById('btn-logout').addEventListener('click', () => {
-            currentWalletId = null;
-            currentWalletData = null;
+        // --- ИНИЦИАЛИЗАЦИЯ И AUTH ---
+        async function init() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.error("Auth error:", err);
+                showToast('Ошибка авторизации в базе', true);
+            }
+
+            onAuthStateChanged(auth, user => {
+                currentUser = user;
+                if (user) {
+                    showScreen('scan');
+                } else {
+                    showScreen('loading');
+                }
+            });
+        }
+
+        // --- ОБРАБОТЧИКИ КНОПОК ---
+        document.getElementById('btn-scan').addEventListener('click', startNfcScan);
+        document.getElementById('btn-mock').addEventListener('click', mockScan);
+        document.getElementById('btn-back').addEventListener('click', () => {
+            currentNfcId = null;
             showScreen('scan');
         });
+        document.getElementById('btn-edit-mode').addEventListener('click', openEditMode);
+        document.getElementById('btn-cancel-edit').addEventListener('click', () => {
+            showScreen('profile');
+            setTimeout(() => playMusic(), 500); // Возвращаем музыку
+        });
+        document.getElementById('btn-save-edit').addEventListener('click', saveProfileToFirebase);
+
+        // Запуск
+        init();
+
     </script>
 </body>
 </html>
